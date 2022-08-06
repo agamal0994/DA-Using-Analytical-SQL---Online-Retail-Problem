@@ -1,0 +1,27 @@
+--select * from online_retail;
+select step_two.* ,
+case when (( r_score + fm_score ) >= 9) then 'champions'
+when ( r_score = 5 and fm_Score = 2 ) or ( r_score = 4 and fm_Score = 2) or ( r_score = 3 and fm_Score = 3 ) or ( r_score = 4 and fm_Score = 3 ) then 'Potential Loyalist'
+when ( r_score = 5 and fm_Score = 3  ) or ( r_score = 4 and fm_Score = 4) or ( r_score = 3  and fm_Score = 5 ) or ( r_score = 3 and fm_Score = 4) then 'Loyal Customer'
+when ( r_score = 5 and fm_Score = 1  )then 'Recent Customer'
+when ( r_score = 4 and fm_Score = 1 ) or ( r_score = 3  and fm_Score = 1 )  then 'promising'
+when ( r_score = 3 and fm_Score = 2 ) or ( r_score = 2 and fm_Score = 3) or (r_score = 2 and fm_Score = 2) then 'Need Attention'
+when ( r_score = 2 and fm_Score = 5 ) or ( r_score = 2 and fm_Score = 4) or ( r_score = 1 and fm_Score = 3 ) then 'at Risk'
+when (r_score = 1 and fm_Score = 5 ) or ( r_score = 1 and fm_Score = 4)  then 'cannot lose them'
+when (( r_score + fm_Score  ) = 3 ) then 'hibernating'
+when (( r_score + fm_Score ) = 2 ) then 'lost'	
+end as Customer_segment
+from 
+(select step_one.* ,
+ntile(5)over(order by recency desc) as r_score,
+( ( frequency + monetary ) / 2.0)::numeric(10) as fm_score 
+from  (
+select distinct customerid ,
+((select MAX(to_date(invoicedate,'MM/DD/YYYY')) from online_retail) - 
+MAX(to_date(invoicedate,'MM/DD/YYYY')) over (partition by customerid))  as recency ,
+(DENSE_RANK() OVER (PARTITION BY customerid ORDER BY invoiceno ASC )
++ DENSE_RANK() OVER (PARTITION BY customerid ORDER BY invoiceno DESC) ) -1 as frequency ,
+sum(unitprice) over (partition by customerid)::numeric(10,2) as monetary 
+from online_retail ) as step_one
+) as step_two
+where customerid !='';
